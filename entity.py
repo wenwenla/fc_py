@@ -1,3 +1,5 @@
+from pygame import Surface
+
 
 class Entity:
 
@@ -7,5 +9,8 @@ class Entity:
     def on_update(self, delta):
         raise NotImplementedError
 
-    def on_render(self, screen):
+    def on_render(self, screen: Surface):
+        raise NotImplementedError
+
+    def on_event(self, event):
         raise NotImplementedError

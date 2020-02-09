@@ -15,7 +15,7 @@ class Bus:
             if chip.sensitive(addr):
                 read_chip = chip
                 break
-        assert read_chip is not None
+        assert read_chip is not None, 'ADDR: {}'.format(addr)
         return read_chip.read(addr)
 
     def write(self, addr, value):

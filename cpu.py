@@ -24,12 +24,11 @@ AddrMode = Enum('AddrMode', [
 
 class Instruction:
 
-    def __init__(self, name: str, mode: AddrMode, cycle: int, func, fetch):
+    def __init__(self, name: str, mode: AddrMode, cycle: int, func):
         self._name = name
         self._mode = mode
         self._cycle = cycle
         self._func = func # execute the insturction
-        self._fetch = fetch # get next n bytes
 
     def length(self):
         if self._mode == AddrMode.Implied:
@@ -85,56 +84,56 @@ class Instruction:
         '''
         return self._func()
 
-    def __str__(self):
+    def format(self, *args):
         res = self._name
         if self._mode == AddrMode.Implied:
             pass
         elif self._mode == AddrMode.Accumulator:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' ${:02X}'.format(next_byte)
         elif self._mode == AddrMode.Immediate:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' #${:02X}'.format(next_byte)
         elif self._mode == AddrMode.Absolute:
-            lo = self._fetch(1)
-            hi = self._fetch(2)
+            lo = args[0]
+            hi = args[1]
             res += ' ${:04X}'.format((hi << 8) + lo)
         elif self._mode == AddrMode.ZeroPage:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' ${:02X}'.format(next_byte)
         elif self._mode == AddrMode.AbslouteIndexedX:
-            lo = self._fetch(1)
-            hi = self._fetch(2)
+            lo = args[0]
+            hi = args[1]
             res += ' ${:04X}, X'.format((hi << 8) + lo)
         elif self._mode == AddrMode.AbslouteIndexedY:
-            lo = self._fetch(1)
-            hi = self._fetch(2)
+            lo = args[0]
+            hi = args[1]
             res += ' ${:04X}, Y'.format((hi << 8) + lo)
         elif self._mode == AddrMode.ZeroIndexedX:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' ${:02X}, X'.format(next_byte)
         elif self._mode == AddrMode.ZeroIndexedY:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' ${:02X}, Y'.format(next_byte)
         elif self._mode == AddrMode.Relative:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' ${:02X}'.format(next_byte)
         elif self._mode == AddrMode.ZeroIndexedIndirectX:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' (${:02X}, X)'.format(next_byte)
         elif self._mode == AddrMode.AbslouteIndexedIndirectX:
-            lo = self._fetch(1)
-            hi = self._fetch(2)
+            lo = args[0]
+            hi = args[1]
             res += ' (${:04X}, X)'.format((hi << 8) + lo)
         elif self._mode == AddrMode.IndexedIndirectY:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' (${:02X}), Y'.format(next_byte)
         elif self._mode == AddrMode.ZeroIndirect:
-            next_byte = self._fetch(1)
+            next_byte = args[0]
             res += ' (${:02X})'.format(next_byte)
         elif self._mode == AddrMode.AbslouteIndirect:
-            lo = self._fetch(1)
-            hi = self._fetch(2)
+            lo = args[0]
+            hi = args[1]
             res += ' (${:04X})'.format((hi << 8) + lo)
         return res
 
@@ -145,11 +144,11 @@ class Flag:
         self._n = False # 7
         self._v = False # 6
         # bit 5 is not used, always True
-        self._b = False
-        self._d = False
-        self._i = False
-        self._z = False
-        self._c = False
+        self._b = False # 4
+        self._d = False # 3
+        self._i = False # 2
+        self._z = False # 1
+        self._c = False # 0
 
     def set(self, value: int):
         self.n = (value >> 7 & 1) == 1
@@ -280,279 +279,278 @@ class Cpu6502:
     def __init__(self, bus: Bus):
         self._ins = [
             # 0
-            Instruction('BRK', AddrMode.Implied, 7, self.brk, self.fetch),
-            Instruction('ORA', AddrMode.ZeroIndexedIndirectX, 6, self.ora, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('SLO', AddrMode.ZeroIndexedIndirectX, 8, self.slo, self.fetch),
-            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop, self.fetch),
-            Instruction('ORA', AddrMode.ZeroPage, 3, self.ora, self.fetch),
-            Instruction('ASL', AddrMode.ZeroPage, 5, self.asl, self.fetch),
-            Instruction('SLO', AddrMode.ZeroPage, 5, self.slo, self.fetch),
-            Instruction('PHP', AddrMode.Implied, 3, self.php, self.fetch),
-            Instruction('ORA', AddrMode.Immediate, 2, self.ora, self.fetch),
-            Instruction('ASL', AddrMode.Accumulator, 2, self.asl, self.fetch),
-            Instruction('ANC', AddrMode.Immediate, 2, self.anc, self.fetch),
-            Instruction('NOP', AddrMode.Absolute, 4, self.nop, self.fetch),
-            Instruction('ORA', AddrMode.Absolute, 4, self.ora, self.fetch),
-            Instruction('ASL', AddrMode.Absolute, 6, self.asl, self.fetch),
-            Instruction('SLO', AddrMode.Absolute, 6, self.slo, self.fetch),
+            Instruction('BRK', AddrMode.Implied, 7, self.brk),
+            Instruction('ORA', AddrMode.ZeroIndexedIndirectX, 6, self.ora),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('SLO', AddrMode.ZeroIndexedIndirectX, 8, self.slo),
+            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop),
+            Instruction('ORA', AddrMode.ZeroPage, 3, self.ora),
+            Instruction('ASL', AddrMode.ZeroPage, 5, self.asl),
+            Instruction('SLO', AddrMode.ZeroPage, 5, self.slo),
+            Instruction('PHP', AddrMode.Implied, 3, self.php),
+            Instruction('ORA', AddrMode.Immediate, 2, self.ora),
+            Instruction('ASL', AddrMode.Accumulator, 2, self.asl),
+            Instruction('ANC', AddrMode.Immediate, 2, self.anc),
+            Instruction('NOP', AddrMode.Absolute, 4, self.nop),
+            Instruction('ORA', AddrMode.Absolute, 4, self.ora),
+            Instruction('ASL', AddrMode.Absolute, 6, self.asl),
+            Instruction('SLO', AddrMode.Absolute, 6, self.slo),
             # 1
-            Instruction('BPL', AddrMode.Relative, 2, self.bpl, self.fetch),
-            Instruction('ORA', AddrMode.IndexedIndirectY, 5, self.ora, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('SLO', AddrMode.IndexedIndirectY, 8, self.slo, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('ORA', AddrMode.ZeroIndexedX, 4, self.ora, self.fetch),
-            Instruction('ASL', AddrMode.ZeroIndexedX, 6, self.asl, self.fetch),
-            Instruction('SLO', AddrMode.ZeroIndexedX, 6, self.slo, self.fetch),
-            Instruction('CLC', AddrMode.Implied, 2, self.clc, self.fetch),
-            Instruction('ORA', AddrMode.AbslouteIndexedY, 4, self.ora, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('SLO', AddrMode.AbslouteIndexedY, 7, self.slo, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('ORA', AddrMode.AbslouteIndexedX, 4, self.ora, self.fetch),
-            Instruction('ASL', AddrMode.AbslouteIndexedX, 7, self.asl, self.fetch),
-            Instruction('SLO', AddrMode.AbslouteIndexedX, 7, self.slo, self.fetch),
+            Instruction('BPL', AddrMode.Relative, 2, self.bpl),
+            Instruction('ORA', AddrMode.IndexedIndirectY, 5, self.ora),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('SLO', AddrMode.IndexedIndirectY, 8, self.slo),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('ORA', AddrMode.ZeroIndexedX, 4, self.ora),
+            Instruction('ASL', AddrMode.ZeroIndexedX, 6, self.asl),
+            Instruction('SLO', AddrMode.ZeroIndexedX, 6, self.slo),
+            Instruction('CLC', AddrMode.Implied, 2, self.clc),
+            Instruction('ORA', AddrMode.AbslouteIndexedY, 4, self.ora),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('SLO', AddrMode.AbslouteIndexedY, 7, self.slo),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('ORA', AddrMode.AbslouteIndexedX, 4, self.ora),
+            Instruction('ASL', AddrMode.AbslouteIndexedX, 7, self.asl),
+            Instruction('SLO', AddrMode.AbslouteIndexedX, 7, self.slo),
             # 2
-            Instruction('JSR', AddrMode.Absolute, 6, self.jsr, self.fetch),
-            Instruction('AND', AddrMode.ZeroIndexedIndirectX, 6, self.and_, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('RLA', AddrMode.ZeroIndexedIndirectX, 8, self.rla, self.fetch),
-            Instruction('BIT', AddrMode.ZeroPage, 3, self.bit, self.fetch),
-            Instruction('AND', AddrMode.ZeroPage, 3, self.and_, self.fetch),
-            Instruction('ROL', AddrMode.ZeroPage, 5, self.rol, self.fetch),
-            Instruction('RLA', AddrMode.ZeroPage, 5, self.rla, self.fetch),
-            Instruction('PLP', AddrMode.Implied, 4, self.plp, self.fetch),
-            Instruction('AND', AddrMode.Immediate, 2, self.and_, self.fetch),
-            Instruction('ROL', AddrMode.Accumulator, 2, self.rol, self.fetch),
-            Instruction('ANC', AddrMode.Immediate, 2, self.anc, self.fetch),
-            Instruction('BIT', AddrMode.Absolute, 4, self.bit, self.fetch),
-            Instruction('AND', AddrMode.Absolute, 4, self.and_, self.fetch),
-            Instruction('ROL', AddrMode.Absolute, 6, self.rol, self.fetch),
-            Instruction('RLA', AddrMode.Absolute, 6, self.rla, self.fetch),
+            Instruction('JSR', AddrMode.Absolute, 6, self.jsr),
+            Instruction('AND', AddrMode.ZeroIndexedIndirectX, 6, self.and_),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('RLA', AddrMode.ZeroIndexedIndirectX, 8, self.rla),
+            Instruction('BIT', AddrMode.ZeroPage, 3, self.bit),
+            Instruction('AND', AddrMode.ZeroPage, 3, self.and_),
+            Instruction('ROL', AddrMode.ZeroPage, 5, self.rol),
+            Instruction('RLA', AddrMode.ZeroPage, 5, self.rla),
+            Instruction('PLP', AddrMode.Implied, 4, self.plp),
+            Instruction('AND', AddrMode.Immediate, 2, self.and_),
+            Instruction('ROL', AddrMode.Accumulator, 2, self.rol),
+            Instruction('ANC', AddrMode.Immediate, 2, self.anc),
+            Instruction('BIT', AddrMode.Absolute, 4, self.bit),
+            Instruction('AND', AddrMode.Absolute, 4, self.and_),
+            Instruction('ROL', AddrMode.Absolute, 6, self.rol),
+            Instruction('RLA', AddrMode.Absolute, 6, self.rla),
             # 3
-            Instruction('BMI', AddrMode.Relative, 2, self.bmi, self.fetch),
-            Instruction('AND', AddrMode.IndexedIndirectY, 5, self.and_, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('RLA', AddrMode.IndexedIndirectY, 8, self.rla, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('AND', AddrMode.ZeroIndexedX, 4, self.and_, self.fetch),
-            Instruction('ROL', AddrMode.ZeroIndexedX, 6, self.rol, self.fetch),
-            Instruction('RLA', AddrMode.ZeroIndexedX, 6, self.rla, self.fetch),
-            Instruction('SEC', AddrMode.Implied, 2, self.sec, self.fetch),
-            Instruction('AND', AddrMode.AbslouteIndexedY, 4, self.and_, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('RLA', AddrMode.AbslouteIndexedY, 7, self.rla, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('AND', AddrMode.AbslouteIndexedX, 4, self.and_, self.fetch),
-            Instruction('ROL', AddrMode.AbslouteIndexedX, 7, self.rol, self.fetch),
-            Instruction('RLA', AddrMode.AbslouteIndexedX, 7, self.rla, self.fetch),
+            Instruction('BMI', AddrMode.Relative, 2, self.bmi),
+            Instruction('AND', AddrMode.IndexedIndirectY, 5, self.and_),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('RLA', AddrMode.IndexedIndirectY, 8, self.rla),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('AND', AddrMode.ZeroIndexedX, 4, self.and_),
+            Instruction('ROL', AddrMode.ZeroIndexedX, 6, self.rol),
+            Instruction('RLA', AddrMode.ZeroIndexedX, 6, self.rla),
+            Instruction('SEC', AddrMode.Implied, 2, self.sec),
+            Instruction('AND', AddrMode.AbslouteIndexedY, 4, self.and_),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('RLA', AddrMode.AbslouteIndexedY, 7, self.rla),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('AND', AddrMode.AbslouteIndexedX, 4, self.and_),
+            Instruction('ROL', AddrMode.AbslouteIndexedX, 7, self.rol),
+            Instruction('RLA', AddrMode.AbslouteIndexedX, 7, self.rla),
             # 4
-            Instruction('RTI', AddrMode.Implied, 6, self.rti, self.fetch),
-            Instruction('EOR', AddrMode.ZeroIndexedIndirectX, 6, self.eor, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('SRE', AddrMode.ZeroIndexedIndirectX, 8, self.sre, self.fetch),
-            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop, self.fetch),
-            Instruction('EOR', AddrMode.ZeroPage, 3, self.eor, self.fetch),
-            Instruction('LSR', AddrMode.ZeroPage, 5, self.lsr, self.fetch),
-            Instruction('SRE', AddrMode.ZeroPage, 5, self.sre, self.fetch),
-            Instruction('PHA', AddrMode.Implied, 3, self.pha, self.fetch),
-            Instruction('EOR', AddrMode.Immediate, 2, self.eor, self.fetch),
-            Instruction('LSR', AddrMode.Accumulator, 2, self.lsr, self.fetch),
-            Instruction('ALR', AddrMode.Immediate, 2, self.alr, self.fetch),
-            Instruction('JMP', AddrMode.Absolute, 3, self.jmp, self.fetch),
-            Instruction('EOR', AddrMode.Absolute, 4, self.eor, self.fetch),
-            Instruction('LSR', AddrMode.Absolute, 6, self.lsr, self.fetch),
-            Instruction('SRE', AddrMode.Absolute, 6, self.sre, self.fetch),
+            Instruction('RTI', AddrMode.Implied, 6, self.rti),
+            Instruction('EOR', AddrMode.ZeroIndexedIndirectX, 6, self.eor),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('SRE', AddrMode.ZeroIndexedIndirectX, 8, self.sre),
+            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop),
+            Instruction('EOR', AddrMode.ZeroPage, 3, self.eor),
+            Instruction('LSR', AddrMode.ZeroPage, 5, self.lsr),
+            Instruction('SRE', AddrMode.ZeroPage, 5, self.sre),
+            Instruction('PHA', AddrMode.Implied, 3, self.pha),
+            Instruction('EOR', AddrMode.Immediate, 2, self.eor),
+            Instruction('LSR', AddrMode.Accumulator, 2, self.lsr),
+            Instruction('ALR', AddrMode.Immediate, 2, self.alr),
+            Instruction('JMP', AddrMode.Absolute, 3, self.jmp),
+            Instruction('EOR', AddrMode.Absolute, 4, self.eor),
+            Instruction('LSR', AddrMode.Absolute, 6, self.lsr),
+            Instruction('SRE', AddrMode.Absolute, 6, self.sre),
             # 5
-            Instruction('BVC', AddrMode.Relative, 2, self.bvc, self.fetch),
-            Instruction('EOR', AddrMode.IndexedIndirectY, 5, self.eor, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('SRE', AddrMode.IndexedIndirectY, 8, self.sre, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('EOR', AddrMode.ZeroIndexedX, 4, self.eor, self.fetch),
-            Instruction('LSR', AddrMode.ZeroIndexedX, 6, self.lsr, self.fetch),
-            Instruction('SRE', AddrMode.ZeroIndexedX, 6, self.sre, self.fetch),
-            Instruction('CLI', AddrMode.Implied, 2, self.cli, self.fetch),
-            Instruction('EOR', AddrMode.AbslouteIndexedY, 4, self.eor, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('SRE', AddrMode.AbslouteIndexedY, 7, self.sre, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('EOR', AddrMode.AbslouteIndexedX, 4, self.eor, self.fetch),
-            Instruction('LSR', AddrMode.AbslouteIndexedX, 7, self.lsr, self.fetch),
-            Instruction('SRE', AddrMode.AbslouteIndexedX, 7, self.sre, self.fetch),
+            Instruction('BVC', AddrMode.Relative, 2, self.bvc),
+            Instruction('EOR', AddrMode.IndexedIndirectY, 5, self.eor),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('SRE', AddrMode.IndexedIndirectY, 8, self.sre),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('EOR', AddrMode.ZeroIndexedX, 4, self.eor),
+            Instruction('LSR', AddrMode.ZeroIndexedX, 6, self.lsr),
+            Instruction('SRE', AddrMode.ZeroIndexedX, 6, self.sre),
+            Instruction('CLI', AddrMode.Implied, 2, self.cli),
+            Instruction('EOR', AddrMode.AbslouteIndexedY, 4, self.eor),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('SRE', AddrMode.AbslouteIndexedY, 7, self.sre),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('EOR', AddrMode.AbslouteIndexedX, 4, self.eor),
+            Instruction('LSR', AddrMode.AbslouteIndexedX, 7, self.lsr),
+            Instruction('SRE', AddrMode.AbslouteIndexedX, 7, self.sre),
             # 6
-            Instruction('RTS', AddrMode.Implied, 6, self.rts, self.fetch),
-            Instruction('ADC', AddrMode.ZeroIndexedIndirectX, 6, self.adc, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('RRA', AddrMode.ZeroIndexedIndirectX, 8, self.rra, self.fetch),
-            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop, self.fetch),
-            Instruction('ADC', AddrMode.ZeroPage, 3, self.adc, self.fetch),
-            Instruction('ROR', AddrMode.ZeroPage, 5, self.ror, self.fetch),
-            Instruction('RRA', AddrMode.ZeroPage, 5, self.rra, self.fetch),
-            Instruction('PLA', AddrMode.Implied, 4, self.pla, self.fetch),
-            Instruction('ADC', AddrMode.Immediate, 2, self.adc, self.fetch),
-            Instruction('ROR', AddrMode.Accumulator, 2, self.ror, self.fetch),
-            Instruction('ARR', AddrMode.Immediate, 2, self.arr, self.fetch),
-            Instruction('JMP', AddrMode.AbslouteIndirect, 5, self.jmp, self.fetch),
-            Instruction('ADC', AddrMode.Absolute, 4, self.adc, self.fetch),
-            Instruction('ROR', AddrMode.Absolute, 6, self.ror, self.fetch),
-            Instruction('RRA', AddrMode.Absolute, 6, self.rra, self.fetch),
+            Instruction('RTS', AddrMode.Implied, 6, self.rts),
+            Instruction('ADC', AddrMode.ZeroIndexedIndirectX, 6, self.adc),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('RRA', AddrMode.ZeroIndexedIndirectX, 8, self.rra),
+            Instruction('NOP', AddrMode.ZeroPage, 3, self.nop),
+            Instruction('ADC', AddrMode.ZeroPage, 3, self.adc),
+            Instruction('ROR', AddrMode.ZeroPage, 5, self.ror),
+            Instruction('RRA', AddrMode.ZeroPage, 5, self.rra),
+            Instruction('PLA', AddrMode.Implied, 4, self.pla),
+            Instruction('ADC', AddrMode.Immediate, 2, self.adc),
+            Instruction('ROR', AddrMode.Accumulator, 2, self.ror),
+            Instruction('ARR', AddrMode.Immediate, 2, self.arr),
+            Instruction('JMP', AddrMode.AbslouteIndirect, 5, self.jmp),
+            Instruction('ADC', AddrMode.Absolute, 4, self.adc),
+            Instruction('ROR', AddrMode.Absolute, 6, self.ror),
+            Instruction('RRA', AddrMode.Absolute, 6, self.rra),
             # 7
-            Instruction('BVS', AddrMode.Relative, 2, self.bvs, self.fetch),
-            Instruction('ADC', AddrMode.IndexedIndirectY, 5, self.adc, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('RRA', AddrMode.IndexedIndirectY, 8, self.rra, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('ADC', AddrMode.ZeroIndexedX, 4, self.adc, self.fetch),
-            Instruction('ROR', AddrMode.ZeroIndexedX, 6, self.ror, self.fetch),
-            Instruction('RRA', AddrMode.ZeroIndexedX, 6, self.rra, self.fetch),
-            Instruction('SEI', AddrMode.Implied, 2, self.sei, self.fetch),
-            Instruction('ADC', AddrMode.AbslouteIndexedY, 4, self.adc, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('RRA', AddrMode.AbslouteIndexedY, 7, self.rra, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('ADC', AddrMode.AbslouteIndexedX, 4, self.adc, self.fetch),
-            Instruction('ROR', AddrMode.AbslouteIndexedX, 7, self.ror, self.fetch),
-            Instruction('RRA', AddrMode.AbslouteIndexedX, 7, self.rra, self.fetch),
+            Instruction('BVS', AddrMode.Relative, 2, self.bvs),
+            Instruction('ADC', AddrMode.IndexedIndirectY, 5, self.adc),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('RRA', AddrMode.IndexedIndirectY, 8, self.rra),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('ADC', AddrMode.ZeroIndexedX, 4, self.adc),
+            Instruction('ROR', AddrMode.ZeroIndexedX, 6, self.ror),
+            Instruction('RRA', AddrMode.ZeroIndexedX, 6, self.rra),
+            Instruction('SEI', AddrMode.Implied, 2, self.sei),
+            Instruction('ADC', AddrMode.AbslouteIndexedY, 4, self.adc),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('RRA', AddrMode.AbslouteIndexedY, 7, self.rra),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('ADC', AddrMode.AbslouteIndexedX, 4, self.adc),
+            Instruction('ROR', AddrMode.AbslouteIndexedX, 7, self.ror),
+            Instruction('RRA', AddrMode.AbslouteIndexedX, 7, self.rra),
             # 8
-            Instruction('NOP', AddrMode.Immediate, 2, self.nop, self.fetch),
-            Instruction('STA', AddrMode.ZeroIndexedIndirectX, 6, self.sta, self.fetch),
-            Instruction('NOP', AddrMode.Immediate, 2, self.nop, self.fetch),
-            Instruction('SAX', AddrMode.ZeroIndexedIndirectX, 6, self.sax, self.fetch),
-            Instruction('STY', AddrMode.ZeroPage, 3, self.sty, self.fetch),
-            Instruction('STA', AddrMode.ZeroPage, 3, self.sta, self.fetch),
-            Instruction('STX', AddrMode.ZeroPage, 3, self.stx, self.fetch),
-            Instruction('SAX', AddrMode.ZeroPage, 3, self.sax, self.fetch),
-            Instruction('DEY', AddrMode.Implied, 2, self.dey, self.fetch),
-            Instruction('NOP', AddrMode.Immediate, 2, self.nop, self.fetch),
-            Instruction('TXA', AddrMode.Implied, 2, self.txa, self.fetch),
-            Instruction('XAA', AddrMode.Immediate, 2, self.xaa, self.fetch),
-            Instruction('STY', AddrMode.Absolute, 4, self.sty, self.fetch),
-            Instruction('STA', AddrMode.Absolute, 4, self.sta, self.fetch),
-            Instruction('STX', AddrMode.Absolute, 4, self.stx, self.fetch),
-            Instruction('SAX', AddrMode.Absolute, 4, self.sax, self.fetch),
+            Instruction('NOP', AddrMode.Immediate, 2, self.nop),
+            Instruction('STA', AddrMode.ZeroIndexedIndirectX, 6, self.sta),
+            Instruction('NOP', AddrMode.Immediate, 2, self.nop),
+            Instruction('SAX', AddrMode.ZeroIndexedIndirectX, 6, self.sax),
+            Instruction('STY', AddrMode.ZeroPage, 3, self.sty),
+            Instruction('STA', AddrMode.ZeroPage, 3, self.sta),
+            Instruction('STX', AddrMode.ZeroPage, 3, self.stx),
+            Instruction('SAX', AddrMode.ZeroPage, 3, self.sax),
+            Instruction('DEY', AddrMode.Implied, 2, self.dey),
+            Instruction('NOP', AddrMode.Immediate, 2, self.nop),
+            Instruction('TXA', AddrMode.Implied, 2, self.txa),
+            Instruction('XAA', AddrMode.Immediate, 2, self.xaa),
+            Instruction('STY', AddrMode.Absolute, 4, self.sty),
+            Instruction('STA', AddrMode.Absolute, 4, self.sta),
+            Instruction('STX', AddrMode.Absolute, 4, self.stx),
+            Instruction('SAX', AddrMode.Absolute, 4, self.sax),
             # 9
-            Instruction('BCC', AddrMode.Relative, 2, self.bcc, self.fetch),
-            Instruction('STA', AddrMode.IndexedIndirectY, 6, self.sta, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('AHX', AddrMode.IndexedIndirectY, 6, self.ahx, self.fetch),
-            Instruction('STY', AddrMode.ZeroIndexedX, 4, self.sty, self.fetch),
-            Instruction('STA', AddrMode.ZeroIndexedX, 4, self.sta, self.fetch),
-            Instruction('STX', AddrMode.ZeroIndexedY, 4, self.stx, self.fetch),
-            Instruction('SAX', AddrMode.ZeroIndexedY, 4, self.sax, self.fetch),
-            Instruction('TYA', AddrMode.Implied, 2, self.tya, self.fetch),
-            Instruction('STA', AddrMode.AbslouteIndexedY, 5, self.sta, self.fetch),
-            Instruction('TXS', AddrMode.Implied, 2, self.txs, self.fetch),
-            Instruction('TAS', AddrMode.AbslouteIndexedY, 5, self.tas, self.fetch),
-            Instruction('SHY', AddrMode.AbslouteIndexedX, 5, self.shy, self.fetch),
-            Instruction('STA', AddrMode.AbslouteIndexedX, 5, self.sta, self.fetch),
-            Instruction('SHX', AddrMode.AbslouteIndexedY, 5, self.shx, self.fetch),
-            Instruction('AHX', AddrMode.AbslouteIndexedY, 5, self.ahx, self.fetch),
+            Instruction('BCC', AddrMode.Relative, 2, self.bcc),
+            Instruction('STA', AddrMode.IndexedIndirectY, 6, self.sta),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('AHX', AddrMode.IndexedIndirectY, 6, self.ahx),
+            Instruction('STY', AddrMode.ZeroIndexedX, 4, self.sty),
+            Instruction('STA', AddrMode.ZeroIndexedX, 4, self.sta),
+            Instruction('STX', AddrMode.ZeroIndexedY, 4, self.stx),
+            Instruction('SAX', AddrMode.ZeroIndexedY, 4, self.sax),
+            Instruction('TYA', AddrMode.Implied, 2, self.tya),
+            Instruction('STA', AddrMode.AbslouteIndexedY, 5, self.sta),
+            Instruction('TXS', AddrMode.Implied, 2, self.txs),
+            Instruction('TAS', AddrMode.AbslouteIndexedY, 5, self.tas),
+            Instruction('SHY', AddrMode.AbslouteIndexedX, 5, self.shy),
+            Instruction('STA', AddrMode.AbslouteIndexedX, 5, self.sta),
+            Instruction('SHX', AddrMode.AbslouteIndexedY, 5, self.shx),
+            Instruction('AHX', AddrMode.AbslouteIndexedY, 5, self.ahx),
             # A
-            Instruction('LDY', AddrMode.Immediate, 2, self.ldy, self.fetch),
-            Instruction('LDA', AddrMode.ZeroIndexedIndirectX, 6, self.lda, self.fetch),
-            Instruction('LDX', AddrMode.Immediate, 2, self.ldx, self.fetch),
-            Instruction('LAX', AddrMode.ZeroIndexedIndirectX, 6, self.lax, self.fetch),
-            Instruction('LDY', AddrMode.ZeroPage, 3, self.ldy, self.fetch),
-            Instruction('LDA', AddrMode.ZeroPage, 3, self.lda, self.fetch),
-            Instruction('LDX', AddrMode.ZeroPage, 3, self.ldx, self.fetch),
-            Instruction('LAX', AddrMode.ZeroPage, 3, self.lax, self.fetch),
-            Instruction('TAY', AddrMode.Implied, 2, self.tay, self.fetch),
-            Instruction('LDA', AddrMode.Immediate, 2, self.lda, self.fetch),
-            Instruction('TAX', AddrMode.Implied, 2, self.tax, self.fetch),
-            Instruction('LAX', AddrMode.Immediate, 2, self.lax, self.fetch),
-            Instruction('LDY', AddrMode.Absolute, 4, self.ldy, self.fetch),
-            Instruction('LDA', AddrMode.Absolute, 4, self.lda, self.fetch),
-            Instruction('LDX', AddrMode.Absolute, 4, self.ldx, self.fetch),
-            Instruction('LAX', AddrMode.Absolute, 4, self.lax, self.fetch),
+            Instruction('LDY', AddrMode.Immediate, 2, self.ldy),
+            Instruction('LDA', AddrMode.ZeroIndexedIndirectX, 6, self.lda),
+            Instruction('LDX', AddrMode.Immediate, 2, self.ldx),
+            Instruction('LAX', AddrMode.ZeroIndexedIndirectX, 6, self.lax),
+            Instruction('LDY', AddrMode.ZeroPage, 3, self.ldy),
+            Instruction('LDA', AddrMode.ZeroPage, 3, self.lda),
+            Instruction('LDX', AddrMode.ZeroPage, 3, self.ldx),
+            Instruction('LAX', AddrMode.ZeroPage, 3, self.lax),
+            Instruction('TAY', AddrMode.Implied, 2, self.tay),
+            Instruction('LDA', AddrMode.Immediate, 2, self.lda),
+            Instruction('TAX', AddrMode.Implied, 2, self.tax),
+            Instruction('LAX', AddrMode.Immediate, 2, self.lax),
+            Instruction('LDY', AddrMode.Absolute, 4, self.ldy),
+            Instruction('LDA', AddrMode.Absolute, 4, self.lda),
+            Instruction('LDX', AddrMode.Absolute, 4, self.ldx),
+            Instruction('LAX', AddrMode.Absolute, 4, self.lax),
             # B
-            Instruction('BCS', AddrMode.Relative, 2, self.bcs, self.fetch),
-            Instruction('LDA', AddrMode.IndexedIndirectY, 5, self.lda, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('LAX', AddrMode.IndexedIndirectY, 5, self.lax, self.fetch),
-            Instruction('LDY', AddrMode.ZeroIndexedX, 4, self.ldy, self.fetch),
-            Instruction('LDA', AddrMode.ZeroIndexedX, 4, self.lda, self.fetch),
-            Instruction('LDX', AddrMode.ZeroIndexedY, 4, self.ldx, self.fetch),
-            Instruction('LAX', AddrMode.ZeroIndexedY, 4, self.lax, self.fetch),
-            Instruction('CLV', AddrMode.Implied, 2, self.clv, self.fetch),
-            Instruction('LDA', AddrMode.AbslouteIndexedY, 4, self.lda, self.fetch),
-            Instruction('TSX', AddrMode.Implied, 2, self.tsx, self.fetch),
-            Instruction('LAS', AddrMode.AbslouteIndexedY, 4, self.las, self.fetch),
-            Instruction('LDY', AddrMode.AbslouteIndexedX, 4, self.ldy, self.fetch),
-            Instruction('LDA', AddrMode.AbslouteIndexedX, 4, self.lda, self.fetch),
-            Instruction('LDX', AddrMode.AbslouteIndexedY, 4, self.ldx, self.fetch),
-            Instruction('LAX', AddrMode.AbslouteIndexedY, 4, self.lax, self.fetch),
+            Instruction('BCS', AddrMode.Relative, 2, self.bcs),
+            Instruction('LDA', AddrMode.IndexedIndirectY, 5, self.lda),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('LAX', AddrMode.IndexedIndirectY, 5, self.lax),
+            Instruction('LDY', AddrMode.ZeroIndexedX, 4, self.ldy),
+            Instruction('LDA', AddrMode.ZeroIndexedX, 4, self.lda),
+            Instruction('LDX', AddrMode.ZeroIndexedY, 4, self.ldx),
+            Instruction('LAX', AddrMode.ZeroIndexedY, 4, self.lax),
+            Instruction('CLV', AddrMode.Implied, 2, self.clv),
+            Instruction('LDA', AddrMode.AbslouteIndexedY, 4, self.lda),
+            Instruction('TSX', AddrMode.Implied, 2, self.tsx),
+            Instruction('LAS', AddrMode.AbslouteIndexedY, 4, self.las),
+            Instruction('LDY', AddrMode.AbslouteIndexedX, 4, self.ldy),
+            Instruction('LDA', AddrMode.AbslouteIndexedX, 4, self.lda),
+            Instruction('LDX', AddrMode.AbslouteIndexedY, 4, self.ldx),
+            Instruction('LAX', AddrMode.AbslouteIndexedY, 4, self.lax),
             # C
-            Instruction('CPY', AddrMode.Immediate, 2, self.cpy, self.fetch),
-            Instruction('CMP', AddrMode.ZeroIndexedIndirectX, 6, self.cmp, self.fetch),
-            Instruction('NOP', AddrMode.Immediate, 2, self.nop, self.fetch),
-            Instruction('DCP', AddrMode.ZeroIndexedIndirectX, 8, self.dcp, self.fetch),
-            Instruction('CPY', AddrMode.ZeroPage, 3, self.cpy, self.fetch),
-            Instruction('CMP', AddrMode.ZeroPage, 3, self.cmp, self.fetch),
-            Instruction('DEC', AddrMode.ZeroPage, 5, self.dec, self.fetch),
-            Instruction('DCP', AddrMode.ZeroPage, 5, self.dcp, self.fetch),
-            Instruction('INY', AddrMode.Implied, 2, self.iny, self.fetch),
-            Instruction('CMP', AddrMode.Immediate, 2, self.cmp, self.fetch),
-            Instruction('DEX', AddrMode.Implied, 2, self.dex, self.fetch),
-            Instruction('AXS', AddrMode.Immediate, 2, self.axs, self.fetch),
-            Instruction('CPY', AddrMode.Absolute, 4, self.cpy, self.fetch),
-            Instruction('CMP', AddrMode.Absolute, 4, self.cmp, self.fetch),
-            Instruction('DEC', AddrMode.Absolute, 6, self.dec, self.fetch),
-            Instruction('DCP', AddrMode.Absolute, 6, self.dcp, self.fetch),
+            Instruction('CPY', AddrMode.Immediate, 2, self.cpy),
+            Instruction('CMP', AddrMode.ZeroIndexedIndirectX, 6, self.cmp),
+            Instruction('NOP', AddrMode.Immediate, 2, self.nop),
+            Instruction('DCP', AddrMode.ZeroIndexedIndirectX, 8, self.dcp),
+            Instruction('CPY', AddrMode.ZeroPage, 3, self.cpy),
+            Instruction('CMP', AddrMode.ZeroPage, 3, self.cmp),
+            Instruction('DEC', AddrMode.ZeroPage, 5, self.dec),
+            Instruction('DCP', AddrMode.ZeroPage, 5, self.dcp),
+            Instruction('INY', AddrMode.Implied, 2, self.iny),
+            Instruction('CMP', AddrMode.Immediate, 2, self.cmp),
+            Instruction('DEX', AddrMode.Implied, 2, self.dex),
+            Instruction('AXS', AddrMode.Immediate, 2, self.axs),
+            Instruction('CPY', AddrMode.Absolute, 4, self.cpy),
+            Instruction('CMP', AddrMode.Absolute, 4, self.cmp),
+            Instruction('DEC', AddrMode.Absolute, 6, self.dec),
+            Instruction('DCP', AddrMode.Absolute, 6, self.dcp),
             # D
-            Instruction('BNE', AddrMode.Relative, 2, self.bne, self.fetch),
-            Instruction('CMP', AddrMode.IndexedIndirectY, 5, self.cmp, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('DCP', AddrMode.IndexedIndirectY, 8, self.dcp, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('CMP', AddrMode.ZeroIndexedX, 4, self.cmp, self.fetch),
-            Instruction('DEC', AddrMode.ZeroIndexedX, 6, self.dec, self.fetch),
-            Instruction('DCP', AddrMode.ZeroIndexedX, 6, self.dcp, self.fetch),
-            Instruction('CLD', AddrMode.Implied, 2, self.cld, self.fetch),
-            Instruction('CMP', AddrMode.AbslouteIndexedY, 4, self.cmp, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('DCP', AddrMode.AbslouteIndexedY, 7, self.dcp, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('CMP', AddrMode.AbslouteIndexedX, 4, self.cmp, self.fetch),
-            Instruction('DEC', AddrMode.AbslouteIndexedX, 7, self.dec, self.fetch),
-            Instruction('DCP', AddrMode.AbslouteIndexedX, 7, self.dcp, self.fetch),
+            Instruction('BNE', AddrMode.Relative, 2, self.bne),
+            Instruction('CMP', AddrMode.IndexedIndirectY, 5, self.cmp),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('DCP', AddrMode.IndexedIndirectY, 8, self.dcp),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('CMP', AddrMode.ZeroIndexedX, 4, self.cmp),
+            Instruction('DEC', AddrMode.ZeroIndexedX, 6, self.dec),
+            Instruction('DCP', AddrMode.ZeroIndexedX, 6, self.dcp),
+            Instruction('CLD', AddrMode.Implied, 2, self.cld),
+            Instruction('CMP', AddrMode.AbslouteIndexedY, 4, self.cmp),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('DCP', AddrMode.AbslouteIndexedY, 7, self.dcp),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('CMP', AddrMode.AbslouteIndexedX, 4, self.cmp),
+            Instruction('DEC', AddrMode.AbslouteIndexedX, 7, self.dec),
+            Instruction('DCP', AddrMode.AbslouteIndexedX, 7, self.dcp),
             # E
-            Instruction('CPX', AddrMode.Immediate, 2, self.cpx, self.fetch),
-            Instruction('SBC', AddrMode.ZeroIndexedIndirectX, 6, self.sbc, self.fetch),
-            Instruction('NOP', AddrMode.Immediate, 2, self.nop, self.fetch),
-            Instruction('ISC', AddrMode.ZeroIndexedIndirectX, 8, self.isc, self.fetch),
-            Instruction('CPX', AddrMode.ZeroPage, 3, self.cpx, self.fetch),
-            Instruction('SBC', AddrMode.ZeroPage, 3, self.sbc, self.fetch),
-            Instruction('INC', AddrMode.ZeroPage, 5, self.inc, self.fetch),
-            Instruction('ISC', AddrMode.ZeroPage, 5, self.isc, self.fetch),
-            Instruction('INX', AddrMode.Implied, 2, self.inx, self.fetch),
-            Instruction('SBC', AddrMode.Immediate, 2, self.sbc, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('SBC', AddrMode.Immediate, 2, self.sbc, self.fetch),
-            Instruction('CPX', AddrMode.Absolute, 4, self.cpx, self.fetch),
-            Instruction('SBC', AddrMode.Absolute, 4, self.sbc, self.fetch),
-            Instruction('INC', AddrMode.Absolute, 6, self.inc, self.fetch),
-            Instruction('ISC', AddrMode.Absolute, 6, self.isc, self.fetch),
+            Instruction('CPX', AddrMode.Immediate, 2, self.cpx),
+            Instruction('SBC', AddrMode.ZeroIndexedIndirectX, 6, self.sbc),
+            Instruction('NOP', AddrMode.Immediate, 2, self.nop),
+            Instruction('ISC', AddrMode.ZeroIndexedIndirectX, 8, self.isc),
+            Instruction('CPX', AddrMode.ZeroPage, 3, self.cpx),
+            Instruction('SBC', AddrMode.ZeroPage, 3, self.sbc),
+            Instruction('INC', AddrMode.ZeroPage, 5, self.inc),
+            Instruction('ISC', AddrMode.ZeroPage, 5, self.isc),
+            Instruction('INX', AddrMode.Implied, 2, self.inx),
+            Instruction('SBC', AddrMode.Immediate, 2, self.sbc),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('SBC', AddrMode.Immediate, 2, self.sbc),
+            Instruction('CPX', AddrMode.Absolute, 4, self.cpx),
+            Instruction('SBC', AddrMode.Absolute, 4, self.sbc),
+            Instruction('INC', AddrMode.Absolute, 6, self.inc),
+            Instruction('ISC', AddrMode.Absolute, 6, self.isc),
             # F
-            Instruction('BEQ', AddrMode.Relative, 2, self.beq, self.fetch),
-            Instruction('SBC', AddrMode.IndexedIndirectY, 5, self.sbc, self.fetch),
-            Instruction('KIL', AddrMode.Implied, 6, self.kil, self.fetch),
-            Instruction('ISC', AddrMode.IndexedIndirectY, 8, self.isc, self.fetch),
-            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop, self.fetch),
-            Instruction('SBC', AddrMode.ZeroIndexedX, 4, self.sbc, self.fetch),
-            Instruction('INC', AddrMode.ZeroIndexedX, 6, self.inc, self.fetch),
-            Instruction('ISC', AddrMode.ZeroIndexedX, 6, self.isc, self.fetch),
-            Instruction('SED', AddrMode.Implied, 2, self.sed, self.fetch),
-            Instruction('SBC', AddrMode.AbslouteIndexedY, 4, self.sbc, self.fetch),
-            Instruction('NOP', AddrMode.Implied, 2, self.nop, self.fetch),
-            Instruction('ISC', AddrMode.AbslouteIndexedY, 7, self.isc, self.fetch),
-            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop, self.fetch),
-            Instruction('SBC', AddrMode.AbslouteIndexedX, 4, self.sbc, self.fetch),
-            Instruction('INC', AddrMode.AbslouteIndexedX, 7, self.inc, self.fetch),
-            Instruction('ISC', AddrMode.AbslouteIndexedX, 7, self.isc, self.fetch),
+            Instruction('BEQ', AddrMode.Relative, 2, self.beq),
+            Instruction('SBC', AddrMode.IndexedIndirectY, 5, self.sbc),
+            Instruction('KIL', AddrMode.Implied, 6, self.kil),
+            Instruction('ISC', AddrMode.IndexedIndirectY, 8, self.isc),
+            Instruction('NOP', AddrMode.ZeroIndexedX, 4, self.nop),
+            Instruction('SBC', AddrMode.ZeroIndexedX, 4, self.sbc),
+            Instruction('INC', AddrMode.ZeroIndexedX, 6, self.inc),
+            Instruction('ISC', AddrMode.ZeroIndexedX, 6, self.isc),
+            Instruction('SED', AddrMode.Implied, 2, self.sed),
+            Instruction('SBC', AddrMode.AbslouteIndexedY, 4, self.sbc),
+            Instruction('NOP', AddrMode.Implied, 2, self.nop),
+            Instruction('ISC', AddrMode.AbslouteIndexedY, 7, self.isc),
+            Instruction('NOP', AddrMode.AbslouteIndexedX, 4, self.nop),
+            Instruction('SBC', AddrMode.AbslouteIndexedX, 4, self.sbc),
+            Instruction('INC', AddrMode.AbslouteIndexedX, 7, self.inc),
+            Instruction('ISC', AddrMode.AbslouteIndexedX, 7, self.isc),
         ]
-        print(len(self._ins))
         self._bus = bus
         self._pc = Register16()
         self._sp = Register8()
@@ -571,7 +569,11 @@ class Cpu6502:
         hi = self._bus.read(0xfffd)
         self._pc.value = (hi << 8) + lo
         self._now_cycle = 7 # TODO: need to check how many cycles are needed
-
+        self._sp.value = 0xff
+        self._push(hi)
+        self._push(lo)
+        self._flag.i = True
+        
     def test_mode(self):
         self._pc.value = 0xc000
         self._sp.value = 0xfd
@@ -671,9 +673,9 @@ class Cpu6502:
 
     def run(self):
         opcode = self._bus.read(self._pc.value)
+        print(opcode)
         ins = self._ins[opcode]
         self._next_addr = self._pc.value + ins.length()
-        print('${:04X}: {}'.format(self._pc.value, ins))
         cross_boundary = self.pre_fill()
 
         branch_taken = ins.execute()
@@ -692,6 +694,25 @@ class Cpu6502:
     
     def fetch(self, index):
         return self._bus.read(self._pc.value + index)
+
+    def decode(self, l, r):
+        res = []
+        addr_item = {}
+        now_addr = l
+        while True:
+            opcode = self._bus.read(now_addr)
+            ins = self._ins[opcode]
+            if now_addr + ins.length() > r:
+                break
+            parm = []
+            for i in range(now_addr + 1, now_addr + 3):
+                if i > r:
+                    break
+                parm.append(self._bus.read(i))
+            res.append('${:04X}: {}'.format(now_addr, ins.format(*parm)))
+            addr_item[now_addr] = len(res) - 1
+            now_addr += ins.length()
+        return (addr_item, res)
 
     def brk(self):
         pass

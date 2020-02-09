@@ -47,6 +47,8 @@ class Game:
         for event in pygame.event.get():
             if event.type == QUIT:
                 self.running = False
+            for e in self.entities:
+                e.on_event(event)
 
     def update(self, delta):
         for e in self.entities:

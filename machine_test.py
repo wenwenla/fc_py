@@ -30,12 +30,13 @@ def main():
         n += 1
         log = cpu.log()
         if not real_log.check(log):
-            print('F: {}'.format(OrderedDict(log)))
-            print('T: {}'.format(OrderedDict(real_log.log())))
-            print('{} Addr: {}, Data: {}'.format(n, cpu._addr, cpu._data))
+            # print('F: {}'.format(OrderedDict(log)))
+            # print('T: {}'.format(OrderedDict(real_log.log())))
+            # print('{} Addr: {}, Data: {}'.format(n, cpu._addr, cpu._data))
             break
         else:
-            print('T: {}'.format(OrderedDict(log)))
+            pass
+            # print('T: {}'.format(OrderedDict(log)))
         cpu.run()
         end = real_log.next()
         if end:
