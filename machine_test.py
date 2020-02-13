@@ -1,5 +1,6 @@
-from chip import Ram, PGRRom, PPURegister, PAuExp
+from chip import *
 from cpu import Cpu6502
+from ppu import Ppu
 from bus import Bus
 from nes import Nes
 from log import Log
@@ -7,9 +8,19 @@ from collections import OrderedDict
 
 
 def main():
+    _ppu_bus = Bus()
+    _ppu_pattern = PatternTable()
+    # _ppu_pattern.load(nes.chr)
+    _ppu_name = NameTable()
+    _ppu_palette = PaletteTable()
+    _ppu_bus.connect(_ppu_pattern)
+    _ppu_bus.connect(_ppu_name)
+    _ppu_bus.connect(_ppu_palette)
+    _ppu = Ppu(_ppu_bus)
+
     ram = Ram()
     pgr = PGRRom()
-    ppu_reg = PPURegister()
+    ppu_reg = PPURegister(_ppu_bus)
     pau_exp = PAuExp()
     nes = Nes()
     nes.load('roms/nestest.nes')

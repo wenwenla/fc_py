@@ -1,8 +1,11 @@
 from entity import Entity
+from info_disp import FpsInfo
 from bus import Bus
 from cpu import Cpu6502
 from nes import Nes
-from chip import Ram, PGRRom, PAuExp, PPURegister
+from ppu import Ppu
+from chip import *
+from palettes import PALETTES
 from game import Game
 import pygame
 
@@ -12,44 +15,65 @@ class Machine(Entity):
     def __init__(self):
         super().__init__()
         nes = Nes()
-        nes.load('roms/nestest.nes')
+        nes.load('roms/mario.nes')
+
+        # configure ppu
+        self._ppu_bus = Bus()
+        self._ppu_pattern = PatternTable()
+        self._ppu_pattern.load(nes.chr)
+        self._ppu_name = NameTable()
+        self._ppu_palette = PaletteTable()
+        self._ppu_bus.connect(self._ppu_pattern)
+        self._ppu_bus.connect(self._ppu_name)
+        self._ppu_bus.connect(self._ppu_palette)
+        self._ppu = Ppu(self._ppu_bus)
+
+        # configure cpu
         self._cpu_ram = Ram()
         self._pgr = PGRRom()
         self._pgr.load(nes.pgr)
         self._papu_ram = PAuExp()
-
-        self._ppu_register = PPURegister()
-
         self._cpu_bus = Bus()
         self._cpu_bus.connect(self._pgr)
         self._cpu_bus.connect(self._cpu_ram)
         self._cpu_bus.connect(self._papu_ram)
-        self._cpu_bus.connect(self._ppu_register)
+        self._cpu_bus.connect(self._ppu.get_register())
         self._cpu = Cpu6502(self._cpu_bus)
-        self._cpu.test_mode()
-        self._addr_map, self._code = self._cpu.decode(0xC000, 0xFF00)
-        self._font = pygame.font.SysFont('inconsolatan', 24)
+        self._cpu.reset()
+        
+        self._ppu.set_request_nmi(self._cpu.request_nmi)
 
+        self._addr_map, self._code = self._cpu.decode(0x8000, 0xFF00)
+        self._font = pygame.font.SysFont('inconsolatan', 24)
         self._cpu_running = False
+        self._cpu_time_last = 0
+
+    def step(self):
+        run_cycles = self._cpu.run()
+        for _ in range(run_cycles):
+            self._ppu.run()
+            self._ppu.run()
+            self._ppu.run()
+        return 601 * run_cycles * 50
 
     def draw_code(self, screen):
         log = self._cpu.log()
         pc = log['PC']
-        assert pc in self._addr_map
-        now_pos = self._addr_map[pc]
-        code_x_start = 550
-        code_y_start = 100
-        code_line = 0
-        code_height = 20
-        for pos in range(now_pos - 10, now_pos + 11):
-            if pos < 0 or pos >= len(self._code):
-                continue
-            if pos == now_pos:
-                now_code = self._font.render(self._code[pos], True, (255, 0, 0))
-            else:
-                now_code = self._font.render(self._code[pos], True, (0, 0, 0))    
-            screen.blit(now_code, (code_x_start, code_line * code_height + code_y_start))
-            code_line += 1
+        if pc in self._addr_map:
+            now_pos = self._addr_map[pc]
+            code_x_start = 550
+            code_y_start = 100
+            code_line = 0
+            code_height = 20
+            for pos in range(now_pos - 8, now_pos + 8):
+                if pos < 0 or pos >= len(self._code):
+                    continue
+                if pos == now_pos:
+                    now_code = self._font.render(self._code[pos], True, (255, 0, 0))
+                else:
+                    now_code = self._font.render(self._code[pos], True, (0, 0, 0))    
+                screen.blit(now_code, (code_x_start, code_line * code_height + code_y_start))
+                code_line += 1
 
     def draw_flag(self, screen):
         flag_x_start = 620
@@ -84,29 +108,67 @@ class Machine(Entity):
         screen.blit(reg_x, (reg_x_start, reg_y_start + one_height))
         screen.blit(reg_y, (reg_x_start + one_width, reg_y_start + one_height))
 
+    def draw_ppu(self, screen):
+        img = self._ppu.get_background(0)
+        screen.blit(img, (0, 0))
+        img = self._ppu.get_background(1)
+        screen.blit(img, (256, 0))
+        img = self._ppu.get_background(2)
+        screen.blit(img, (0, 240))
+        img = self._ppu.get_background(3)
+        screen.blit(img, (256, 240))
+
+    def draw_pattern(self, screen):
+        img = self._ppu.get_pattern_image()
+        width = int(256 * 1.125)
+        height = int(128 * 1.125)
+        img = pygame.transform.scale(img, (width, height))
+        screen.blit(img, (800 - width, 600 - height))
+
+    def draw_palettes(self, screen):
+        img = self._ppu.get_palettes_image()
+        img = pygame.transform.scale(img, (128, 64))
+        screen.blit(img, (0, 600 - 64))
+
     def on_update(self, delta):
+        cnt = 0
         if self._cpu_running:
-            self._cpu.run()
+            self._cpu_time_last += delta * 1000000
+            while self._cpu_time_last > 0:
+                self._cpu_time_last -= self.step()
+                cnt += 1
+        # print('Times: {}, Cycles: {}'.format(delta, cnt))
 
     def on_render(self, screen):
-        screen.fill((255, 255, 255))
+        screen.fill(PALETTES[0])
         self.draw_code(screen)
         self.draw_reg(screen)
         self.draw_flag(screen)
+        self.draw_ppu(screen)
+        self.draw_pattern(screen)
+        self.draw_palettes(screen)
+        # print(self._ppu.get_register().ctrl)
+        # print(self._ppu.get_register().status)
 
     def on_event(self, event):
         if event.type == pygame.locals.KEYDOWN:
-            if event.key == pygame.locals.K_r:
+            if event.key == pygame.locals.K_s:
                 self._cpu_running = not self._cpu_running
-            if event.key == pygame.locals.K_SPACE:
+                self._cpu_time_last = 0
+            elif event.key == pygame.locals.K_r:
+                self._cpu.reset()
+                self._cpu_time_last = 0
+            elif event.key == pygame.locals.K_SPACE:
                 if not self._cpu_running:
-                    self._cpu.run()
+                    self.step()
 
 
 def main():
     game = Game(800, 600, "FCEMU")
+    fps = FpsInfo()
     machine = Machine()
     game.add_entity(machine)
+    game.add_entity(fps)
     game.run()
 
 

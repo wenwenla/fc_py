@@ -564,6 +564,8 @@ class Cpu6502:
         self._data = 0
         self._next_addr = 0
 
+        self._nmi_set = False
+
     def reset(self):
         lo = self._bus.read(0xfffc)
         hi = self._bus.read(0xfffd)
@@ -573,14 +575,16 @@ class Cpu6502:
         self._push(hi)
         self._push(lo)
         self._flag.i = True
+        self._nmi_set = False
         
     def test_mode(self):
         self._pc.value = 0xc000
         self._sp.value = 0xfd
         self._now_cycle = 7
         self._flag.i = True
+        self._nmi_set = False
 
-    def pre_fill(self):
+    def pre_fill(self, read_data=True):
         opcode = self._bus.read(self._pc.value)
         ins = self._ins[opcode]
         mode = ins.addr_mode()
@@ -592,7 +596,8 @@ class Cpu6502:
             lo = self.fetch(1)
             hi = self.fetch(2)
             self._addr = u16((hi << 8) + lo)
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
         elif mode == AddrMode.Accumulator:
             self._addr = -1
             self._data = self._a.value
@@ -601,7 +606,8 @@ class Cpu6502:
             self._data = self.fetch(1)
         elif mode == AddrMode.ZeroPage:
             self._addr = self.fetch(1)
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
         elif mode == AddrMode.Relative:
             self._addr = -1
             self._data = self.fetch(1)
@@ -614,12 +620,14 @@ class Cpu6502:
             lo = self._bus.read(addr)
             hi = self._bus.read((addr + 1) % 256)
             self._addr = u16((hi << 8) + lo + self._y.value)
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
             cross_boundry = (lo + self._y.value) > 0xff
         elif mode == AddrMode.ZeroIndexedIndirectX:
             index = u8(self.fetch(1) + self._x.value)
             self._addr = u16(self._bus.read(index) + ((self._bus.read((index + 1) & 0xff)) << 8))
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
         elif mode == AddrMode.AbslouteIndirect:
             addr = self.fetch(1) + (self.fetch(2) << 8)
             if (addr & 0xff) == 0xff:
@@ -629,17 +637,21 @@ class Cpu6502:
             self._data = -1
         elif mode == AddrMode.AbslouteIndexedY:
             self._addr = u16(self._y.value + self.fetch(1) + (self.fetch(2) << 8))
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
             cross_boundry = (self._y.value + self.fetch(1) > 0xff)
         elif mode == AddrMode.ZeroIndexedX:
             self._addr = u8(self._x.value + self.fetch(1))
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
         elif mode == AddrMode.ZeroIndexedY:
             self._addr = u8(self._y.value + self.fetch(1))
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
         elif mode == AddrMode.AbslouteIndexedX:
             self._addr = u16(self._x.value + self.fetch(1) + (self.fetch(2) << 8))
-            self._data = self._bus.read(self._addr)
+            if read_data:
+                self._data = self._bus.read(self._addr)
             cross_boundry = (self._x.value + self.fetch(1) > 0xff)
         else:
             assert False, 'Need to impl, {}'.format(mode)
@@ -652,6 +664,9 @@ class Cpu6502:
     def _pop(self):
         self._sp.value += 1
         return self._bus.read(self._sp.value + 0x100)
+
+    def request_nmi(self):
+        self._nmi_set = True
 
     def log(self):
         status = {
@@ -666,18 +681,31 @@ class Cpu6502:
         return status
 
     def nmi(self):
-        pass
+        print('NMI CALLED, addr={:04X}'.format(self._pc.value))
+        self._nmi_set = False
+        self._push((self._pc.value >> 8) & 0xFF)
+        self._push(self._pc.value & 0xFF)
+        self._push(self._flag.get() & 0b11101111)
+        self._flag.i = True
+        self._pc.value = ((self._bus.read(0xFFFB) << 8) | self._bus.read(0xFFFA))
+        return False
 
     def irq(self):
         pass
 
     def run(self):
+        pre_cycle = self._now_cycle
+
+        if self._nmi_set:
+            self.nmi()
+            self._now_cycle += 7
+            return self._now_cycle - pre_cycle
+
+        #TODO: check irq && brk
         opcode = self._bus.read(self._pc.value)
-        print(opcode)
         ins = self._ins[opcode]
         self._next_addr = self._pc.value + ins.length()
-        cross_boundary = self.pre_fill()
-
+        cross_boundary = self.pre_fill(ins.name() not in {'STA', 'STX', 'STY'})
         branch_taken = ins.execute()
         if branch_taken is None:
             assert False
@@ -691,6 +719,7 @@ class Cpu6502:
         else:
             if cross_boundary and ins.name() not in {'RRA', 'STA', 'STX', 'STY', 'DCP', 'ISC', 'SLO', 'RLA', 'SRE'}:
                 self._now_cycle += 1
+        return self._now_cycle - pre_cycle
     
     def fetch(self, index):
         return self._bus.read(self._pc.value + index)
@@ -837,6 +866,7 @@ class Cpu6502:
         hi = self._pop()
         self._pc.value = (hi << 8) + lo
         self._flag.set(flag)
+        print('RTI CALLED, ADDR={:04X}'.format(self._pc.value))
         return False
 
     def pha(self):
@@ -960,7 +990,6 @@ class Cpu6502:
         pass
 
     def sty(self):
-        assert self._addr != 0x0180
         self._bus.write(self._addr, self._y.value)
         return False
 
@@ -986,12 +1015,10 @@ class Cpu6502:
         pass
 
     def sta(self):
-        assert self._addr != 0x0180
         self._bus.write(self._addr, self._a.value)
         return False
 
     def stx(self):
-        assert self._addr != 0x0180
         self._bus.write(self._addr, self._x.value)
         return False
 
@@ -1108,7 +1135,7 @@ class Cpu6502:
         return False
 
     def dec(self):
-        val = u8(self._bus.read(self._addr) - 1)
+        val = u8(self._data - 1)
         self._bus.write(self._addr, val)
         self._flag.n = (val >> 7 & 1) == 1
         self._flag.z = (val == 0)
@@ -1169,7 +1196,7 @@ class Cpu6502:
         return False
 
     def inc(self):
-        val = u8(1 + self._bus.read(self._addr))
+        val = u8(1 + self._data)
         self._bus.write(self._addr, val)
         self._flag.z = (val == 0)
         self._flag.n = (val >> 7 & 1) == 1

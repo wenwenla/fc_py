@@ -23,7 +23,9 @@ class FpsInfo(entity.Entity):
             self.fps = 1000 * FpsInfo.LAST / (now - self.start_time)
             self.start_time = now
         self.render_cnt += 1
-        screen.fill((255, 255, 255))
         hello = self.font.render('FPS: {:.2f}'.format(self.fps), True, (255, 0, 0))
         screen.blit(hello, (700, self.font.get_linesize()))
+
+    def on_event(self, event):
+        pass
 

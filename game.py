@@ -6,8 +6,10 @@ from pygame.locals import QUIT
 class Game:
 
     def __init__(self, width, height, caption):
-        pygame.display.init()
-        pygame.font.init()
+        pygame.init()
+        # pygame.display.init()
+        # pygame.font.init()
+        # pygame.time.init()
         self.width = width
         self.height = height
         self.display = pygame.display.set_mode((width, height))
@@ -23,14 +25,6 @@ class Game:
         self.prev_update = now_update
         return time_delta
 
-    def _fix_fps(self, fps):
-        now_render = pygame.time.get_ticks()
-        time_delta = now_render - self.prev_render
-        self.prev_render = now_render
-        needed_dleta = 1000 // fps
-        if time_delta < needed_dleta:
-            pygame.time.delay(needed_dleta - time_delta)
-
     def add_entity(self, entity):
         self.entities.append(entity)
 
@@ -39,7 +33,6 @@ class Game:
             self.process_event()
             self.update(self._update_time_delta())
             self.render()
-            self._fix_fps(30)
         pygame.quit()
         sys.exit()
 
@@ -55,6 +48,7 @@ class Game:
             e.on_update(delta)
 
     def render(self):
+        self.display.fill((255, 255, 255))
         for e in self.entities:
             e.on_render(self.display)
         pygame.display.update()
